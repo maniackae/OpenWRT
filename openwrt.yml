@@ -1,0 +1,45 @@
+name: Build OpenWrt (Official)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bash git wget curl build-essential \
+          python3 unzip file gawk gettext libncurses5-dev \
+          libssl-dev xsltproc rsync qemu-utils
+
+    - name: Clone official OpenWrt
+      run: |
+        git clone https://github.com/openwrt/openwrt.git
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Copy custom config
+      run: |
+        cp .config openwrt/.config
+
+    - name: Build
+      run: |
+        cd openwrt
+        make defconfig
+        make -j$(nproc) download
+        make -j$(nproc) || make -j1 V=s
+
+    - name: Upload firmware
+      uses: actions/upload-artifact@v3
+      with:
+        name: firmware
+        path: openwrt/bin/targets
